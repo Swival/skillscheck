@@ -23,6 +23,7 @@ class Diagnostic:
     path: str = ""
     line: int | None = None
     source_url: str = ""
+    fixable: bool = False
 
     def to_dict(self) -> dict:
         d: dict = {
@@ -36,6 +37,8 @@ class Diagnostic:
             d["line"] = self.line
         if self.source_url:
             d["source_url"] = self.source_url
+        if self.fixable:
+            d["fixable"] = True
         return d
 
 

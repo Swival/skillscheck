@@ -11,6 +11,7 @@ import click
 from .models import Diagnostic, Level, ValidationResult
 from .validator import validate
 
+
 LEVEL_SYMBOLS = {
     Level.ERROR: "\u2717",  # ✗
     Level.WARNING: "\u26a0",  # ⚠
@@ -37,6 +38,9 @@ LEVEL_COLORS = {
 )
 @click.option("--strict", is_flag=True, help="Treat warnings as errors (exit 1).")
 @click.option(
+    "--fix", is_flag=True, help="Auto-fix issues that have safe mechanical fixes."
+)
+@click.option(
     "--agents",
     "agent_names",
     default=None,
@@ -52,6 +56,7 @@ def main(
     directory: str,
     fmt: str,
     strict: bool,
+    fix: bool,
     agent_names: str | None,
     check_names: str | None,
 ) -> None:
@@ -61,11 +66,28 @@ def main(
     agents_list = agent_names.split(",") if agent_names else None
     checks_list = check_names.split(",") if check_names else None
 
-    result = validate(root, agent_names=agents_list, checks=checks_list)
+    if fix:
+        result, fixes = validate(
+            root, agent_names=agents_list, checks=checks_list, fix=True
+        )
+    else:
+        result = validate(root, agent_names=agents_list, checks=checks_list)
+        fixes = []
 
     if fmt == "json":
-        click.echo(json.dumps(result.to_dict(), indent=2))
+        d = result.to_dict()
+        if fixes:
+            d["fixes"] = fixes
+        click.echo(json.dumps(d, indent=2))
     else:
+        if fixes:
+            click.echo()
+            click.secho("fixes applied", bold=True)
+            for f in fixes:
+                sym = click.style("\u2714", fg="green")
+                click.echo(f"  {sym} {f}")
+            click.echo()
+            click.secho("re-validation after fixes", bold=True)
         _print_text(result)
 
     sys.exit(result.exit_code(strict))

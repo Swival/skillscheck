@@ -3,18 +3,60 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import overload
 
 from .agents import cross_agent_check, get_adapters
 from .checks import spec, quality, disclosure
+from .fixer import apply_fixes, has_fixable
 from .models import ValidationResult
 from .parser import discover_skills, parse_skill
+
+MAX_FIX_PASSES = 5
+
+
+@overload
+def validate(
+    root: Path,
+    agent_names: list[str] | None = None,
+    checks: list[str] | None = None,
+    *,
+    fix: bool = ...,
+) -> ValidationResult | tuple[ValidationResult, list[str]]: ...
 
 
 def validate(
     root: Path,
     agent_names: list[str] | None = None,
     checks: list[str] | None = None,
-) -> ValidationResult:
+    fix: bool = False,
+) -> ValidationResult | tuple[ValidationResult, list[str]]:
+    result, skills = _run_checks(root, agent_names, checks)
+
+    if not fix:
+        return result
+
+    all_fixes: list[str] = []
+    for pass_num in range(MAX_FIX_PASSES):
+        fixes = apply_fixes(skills, result.skills)
+        if not fixes:
+            break
+        all_fixes.extend(fixes)
+        result, skills = _run_checks(root, agent_names, checks)
+    else:
+        if has_fixable(skills, result.skills):
+            all_fixes.append(
+                f"warning: fix loop hit {MAX_FIX_PASSES}-pass limit; "
+                "re-run --fix to continue"
+            )
+
+    return result, all_fixes
+
+
+def _run_checks(
+    root: Path,
+    agent_names: list[str] | None,
+    checks: list[str] | None,
+) -> tuple[ValidationResult, list]:
     result = ValidationResult()
     run_checks = set(checks) if checks else {"spec", "quality", "disclosure", "agents"}
 
@@ -59,4 +101,4 @@ def validate(
         for d in cross_diags:
             result.add_agent("cross-agent", d)
 
-    return result
+    return result, skills

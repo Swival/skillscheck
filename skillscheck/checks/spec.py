@@ -188,6 +188,7 @@ def _check_name(fm: dict, dir_name: str, path: str) -> list[Diagnostic]:
                     "name must be lowercase",
                     path=path,
                     source_url=SPEC_URL,
+                    fixable=True,
                 )
             )
         else:
@@ -209,6 +210,7 @@ def _check_name(fm: dict, dir_name: str, path: str) -> list[Diagnostic]:
                 "name must not contain consecutive hyphens (--)",
                 path=path,
                 source_url=SPEC_URL,
+                fixable=True,
             )
         )
 
@@ -220,6 +222,7 @@ def _check_name(fm: dict, dir_name: str, path: str) -> list[Diagnostic]:
                 f"name '{name}' does not match directory name '{dir_name}'",
                 path=path,
                 source_url=SPEC_URL,
+                fixable=True,
             )
         )
 

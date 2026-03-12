@@ -12,6 +12,7 @@ uvx skillscheck /path/to/skills-repo
 
 - `--format json`: JSON output for CI pipelines
 - `--strict`: treat warnings as errors (exit 1)
+- `--fix`: auto-fix issues that have safe mechanical fixes (lowercase names, collapse consecutive hyphens, rename directories to match name field)
 - `--agents claude,gemini,codex,copilot,cursor,roo,windsurf,swival`: run specific agent adapter checks (auto-detects if omitted, or `all`)
 - `--check spec,quality,disclosure,agents`: run specific check categories
 
