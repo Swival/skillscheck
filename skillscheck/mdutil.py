@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 
 FENCED_BLOCK_RE = re.compile(r"^(`{3,}|~{3,})", re.MULTILINE)
 INLINE_CODE_RE = re.compile(r"`[^`]+`")
 MD_LINK_RE = re.compile(r"!?\[([^\]]*)\]\(([^)]+)\)")
+ATX_HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)(?:\s+#*)?$", re.MULTILINE)
+SETEXT_H1_RE = re.compile(r"^(.+)\n=+\s*$", re.MULTILINE)
+SETEXT_H2_RE = re.compile(r"^(.+)\n-+\s*$", re.MULTILINE)
 
 
 def strip_code(text: str) -> str:
@@ -63,6 +67,71 @@ def _strip_indented_blocks(text: str) -> str:
         prev_blank = is_blank
 
     return "\n".join(result)
+
+
+def slugify_heading(text: str) -> str:
+    """Convert a markdown heading to a GitHub-style anchor slug."""
+    text = INLINE_CODE_RE.sub("", text)
+    text = re.sub(r"!\[([^\]]*)\]\([^)]+\)", r"\1", text)
+    text = re.sub(r"\[([^\]]*)\]\([^)]+\)", r"\1", text)
+    text = text.lower()
+    text = unicodedata.normalize("NFKD", text)
+    text = re.sub(r"[^\w\s-]", "", text)
+    text = re.sub(r"[\s]+", "-", text.strip())
+    return text
+
+
+def extract_headings(text: str) -> set[str]:
+    """Extract all heading slugs from markdown text (outside code blocks).
+
+    Generates GitHub-style suffixed slugs for duplicate headings
+    (e.g. ``intro``, ``intro-1``, ``intro-2``).
+    """
+    clean = strip_code(text)
+    slugs: set[str] = set()
+    counts: dict[str, int] = {}
+
+    positioned: list[tuple[int, str]] = []
+    for match in ATX_HEADING_RE.finditer(clean):
+        positioned.append((match.start(), match.group(2)))
+    for regex in (SETEXT_H1_RE, SETEXT_H2_RE):
+        for match in regex.finditer(clean):
+            text_line = match.group(1).strip()
+            if not text_line.startswith("#"):
+                positioned.append((match.start(), text_line))
+    positioned.sort(key=lambda x: x[0])
+    raw_headings = [h for _, h in positioned]
+
+    for heading in raw_headings:
+        base = slugify_heading(heading)
+        count = counts.get(base, 0)
+        if count == 0:
+            slugs.add(base)
+        else:
+            slugs.add(f"{base}-{count}")
+        counts[base] = count + 1
+
+    return slugs
+
+
+def extract_fragment_links(text: str) -> list[tuple[str, str]]:
+    """Extract links with fragments. Returns (file_path_or_empty, fragment) tuples."""
+    clean = strip_code(text)
+    results: list[tuple[str, str]] = []
+    for match in MD_LINK_RE.finditer(clean):
+        if match.group(0).startswith("!"):
+            continue
+        target = match.group(2).strip()
+        if target.startswith(("http://", "https://", "mailto:")):
+            continue
+        if "#" not in target:
+            continue
+        path_part, fragment = target.split("#", 1)
+        if "?" in path_part:
+            path_part = path_part.split("?")[0]
+        if fragment:
+            results.append((path_part, fragment))
+    return results
 
 
 def extract_local_link_targets(text: str) -> list[str]:

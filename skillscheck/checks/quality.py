@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 
 from ..models import Diagnostic, Level, SPEC_URL, SkillInfo
-from ..mdutil import extract_local_link_targets
+from ..mdutil import extract_fragment_links, extract_headings, extract_local_link_targets
 
 SECRET_FILENAMES = {
     ".env",
@@ -197,5 +197,51 @@ def _check_links(skill: SkillInfo) -> list[Diagnostic]:
                     path=skill.skill_md_path,
                 )
             )
+
+    diags.extend(_check_fragment_links(skill, skill_dir))
+    return diags
+
+
+def _check_fragment_links(
+    skill: SkillInfo, skill_dir: Path
+) -> list[Diagnostic]:
+    diags: list[Diagnostic] = []
+    fragment_links = extract_fragment_links(skill.body)
+    self_headings = extract_headings(skill.body)
+    file_headings_cache: dict[Path, set[str]] = {}
+
+    for path_part, fragment in fragment_links:
+        if not path_part:
+            # Fragment-only link (e.g. #heading) — resolve against SKILL.md itself
+            if fragment not in self_headings:
+                diags.append(
+                    Diagnostic(
+                        Level.WARNING,
+                        "2c.broken-link.fragment",
+                        f"fragment '#{fragment}' does not match any heading in SKILL.md",
+                        path=skill.skill_md_path,
+                    )
+                )
+        else:
+            # File + fragment link (e.g. references/guide.md#section)
+            target_path = skill_dir / path_part
+            if not target_path.exists():
+                continue  # Already reported by the file-level broken link check
+            if target_path not in file_headings_cache:
+                try:
+                    content = target_path.read_text(encoding="utf-8", errors="ignore")
+                except OSError:
+                    continue
+                file_headings_cache[target_path] = extract_headings(content)
+            headings = file_headings_cache[target_path]
+            if fragment not in headings:
+                diags.append(
+                    Diagnostic(
+                        Level.WARNING,
+                        "2c.broken-link.fragment",
+                        f"fragment '#{fragment}' does not match any heading in '{path_part}'",
+                        path=skill.skill_md_path,
+                    )
+                )
 
     return diags

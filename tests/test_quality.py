@@ -231,3 +231,121 @@ class TestLinks:
         skill = parse_skill(skill_dir)
         diags = check_skill(skill)
         assert not _has_check(diags, "2c.broken-link")
+
+    def test_broken_fragment_link_warning(self, tmp_path):
+        skill_dir = tmp_path / "frag-broken"
+        skill_dir.mkdir()
+        body = "## Installation\n\nSee [usage](#usage-guide) for details."
+        (skill_dir / "SKILL.md").write_text(
+            f"---\nname: frag-broken\ndescription: test. Use when testing.\n---\n{body}"
+        )
+        skill = parse_skill(skill_dir)
+        diags = check_skill(skill)
+        warnings = _warnings(diags)
+        assert _has_check(warnings, "2c.broken-link.fragment")
+
+    def test_valid_fragment_link_no_warning(self, tmp_path):
+        skill_dir = tmp_path / "frag-valid"
+        skill_dir.mkdir()
+        body = "## Installation\n\nSee [install](#installation) for details."
+        (skill_dir / "SKILL.md").write_text(
+            f"---\nname: frag-valid\ndescription: test. Use when testing.\n---\n{body}"
+        )
+        skill = parse_skill(skill_dir)
+        diags = check_skill(skill)
+        assert not _has_check(diags, "2c.broken-link.fragment")
+
+    def test_broken_file_fragment_link_warning(self, tmp_path):
+        skill_dir = tmp_path / "file-frag-broken"
+        skill_dir.mkdir()
+        ref_dir = skill_dir / "references"
+        ref_dir.mkdir()
+        (ref_dir / "guide.md").write_text("## Getting Started\n\nContent here.")
+        body = "See [setup](references/guide.md#setup-instructions) for details."
+        (skill_dir / "SKILL.md").write_text(
+            f"---\nname: file-frag-broken\ndescription: test. Use when testing.\n---\n{body}"
+        )
+        skill = parse_skill(skill_dir)
+        diags = check_skill(skill)
+        warnings = _warnings(diags)
+        assert _has_check(warnings, "2c.broken-link.fragment")
+
+    def test_valid_file_fragment_link_no_warning(self, tmp_path):
+        skill_dir = tmp_path / "file-frag-valid"
+        skill_dir.mkdir()
+        ref_dir = skill_dir / "references"
+        ref_dir.mkdir()
+        (ref_dir / "guide.md").write_text("## Getting Started\n\nContent here.")
+        body = "See [start](references/guide.md#getting-started) for details."
+        (skill_dir / "SKILL.md").write_text(
+            f"---\nname: file-frag-valid\ndescription: test. Use when testing.\n---\n{body}"
+        )
+        skill = parse_skill(skill_dir)
+        diags = check_skill(skill)
+        assert not _has_check(diags, "2c.broken-link.fragment")
+
+    def test_setext_heading_fragment_no_warning(self, tmp_path):
+        skill_dir = tmp_path / "frag-setext"
+        skill_dir.mkdir()
+        body = "Title\n=====\n\nSubtitle\n--------\n\nSee [title](#title) and [sub](#subtitle)."
+        (skill_dir / "SKILL.md").write_text(
+            f"---\nname: frag-setext\ndescription: test. Use when testing.\n---\n{body}"
+        )
+        skill = parse_skill(skill_dir)
+        diags = check_skill(skill)
+        assert not _has_check(diags, "2c.broken-link.fragment")
+
+    def test_broken_setext_heading_fragment_warning(self, tmp_path):
+        skill_dir = tmp_path / "frag-setext-broken"
+        skill_dir.mkdir()
+        body = "Title\n=====\n\nSee [missing](#no-such-heading)."
+        (skill_dir / "SKILL.md").write_text(
+            f"---\nname: frag-setext-broken\ndescription: test. Use when testing.\n---\n{body}"
+        )
+        skill = parse_skill(skill_dir)
+        diags = check_skill(skill)
+        assert _has_check(diags, "2c.broken-link.fragment")
+
+    def test_duplicate_heading_suffixed_anchors(self, tmp_path):
+        skill_dir = tmp_path / "frag-dup"
+        skill_dir.mkdir()
+        body = "## Intro\n\nFirst.\n\n## Intro\n\nSecond.\n\n## Intro\n\nThird.\n\nSee [first](#intro), [second](#intro-1), and [third](#intro-2)."
+        (skill_dir / "SKILL.md").write_text(
+            f"---\nname: frag-dup\ndescription: test. Use when testing.\n---\n{body}"
+        )
+        skill = parse_skill(skill_dir)
+        diags = check_skill(skill)
+        assert not _has_check(diags, "2c.broken-link.fragment")
+
+    def test_atx_heading_above_horizontal_rule_no_phantom(self, tmp_path):
+        skill_dir = tmp_path / "frag-atx-rule"
+        skill_dir.mkdir()
+        body = "## Title\n\n----\n\nSee [bad](#title-1)."
+        (skill_dir / "SKILL.md").write_text(
+            f"---\nname: frag-atx-rule\ndescription: test. Use when testing.\n---\n{body}"
+        )
+        skill = parse_skill(skill_dir)
+        diags = check_skill(skill)
+        assert _has_check(diags, "2c.broken-link.fragment")
+
+    def test_duplicate_heading_unsuffixed_extra_warns(self, tmp_path):
+        skill_dir = tmp_path / "frag-dup-bad"
+        skill_dir.mkdir()
+        body = "## Intro\n\nFirst.\n\n## Intro\n\nSecond.\n\nSee [bad](#intro-5)."
+        (skill_dir / "SKILL.md").write_text(
+            f"---\nname: frag-dup-bad\ndescription: test. Use when testing.\n---\n{body}"
+        )
+        skill = parse_skill(skill_dir)
+        diags = check_skill(skill)
+        assert _has_check(diags, "2c.broken-link.fragment")
+
+    def test_fragment_in_code_block_ignored(self, tmp_path):
+        skill_dir = tmp_path / "frag-code"
+        skill_dir.mkdir()
+        body = "```\n[broken](#nonexistent)\n```\n\nRegular text."
+        (skill_dir / "SKILL.md").write_text(
+            f"---\nname: frag-code\ndescription: test. Use when testing.\n---\n{body}"
+        )
+        skill = parse_skill(skill_dir)
+        diags = check_skill(skill)
+        assert not _has_check(diags, "2c.broken-link.fragment")
