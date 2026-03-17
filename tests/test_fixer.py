@@ -1,14 +1,14 @@
 from pathlib import Path
 
-from skillscheck.fixer import (
+from skillcheck.fixer import (
     apply_fixes,
     _fix_name_lowercase,
     _fix_name_consecutive_hyphens,
     _fix_dir_match,
 )
-from skillscheck.models import SkillDiagnostics, Diagnostic, Level, ValidationResult
-from skillscheck.parser import parse_skill
-from skillscheck.validator import validate
+from skillcheck.models import SkillDiagnostics, Diagnostic, Level, ValidationResult
+from skillcheck.parser import parse_skill
+from skillcheck.validator import validate
 
 
 def _make_skill(tmp_path, dir_name, name, description="A useful skill for testing"):
@@ -226,7 +226,7 @@ class TestValidateWithFix:
 class TestCLIFix:
     def test_fix_flag_text_output(self, tmp_path):
         from click.testing import CliRunner
-        from skillscheck.cli import main
+        from skillcheck.cli import main
 
         _make_skill(tmp_path, "old-name", "new-name")
         runner = CliRunner()
@@ -237,7 +237,7 @@ class TestCLIFix:
 
     def test_fix_flag_json_output(self, tmp_path):
         from click.testing import CliRunner
-        from skillscheck.cli import main
+        from skillcheck.cli import main
         import json
 
         _make_skill(tmp_path, "old-name", "new-name")
@@ -249,7 +249,7 @@ class TestCLIFix:
 
     def test_fix_flag_no_fixable_issues(self, tmp_path):
         from click.testing import CliRunner
-        from skillscheck.cli import main
+        from skillcheck.cli import main
 
         _make_skill(tmp_path, "good", "good")
         runner = CliRunner()
@@ -261,7 +261,7 @@ class TestFixPassCap:
     def test_cap_emits_warning_without_mutating(self, tmp_path, monkeypatch):
         """When the fix loop hits the pass limit, it emits a warning
         without applying further fixes or leaving result out of sync."""
-        import skillscheck.validator as v
+        import skillcheck.validator as v
 
         monkeypatch.setattr(v, "MAX_FIX_PASSES", 1)
 
@@ -283,7 +283,7 @@ class TestFixPassCap:
     def test_has_fixable_does_not_mutate(self, tmp_path, monkeypatch):
         """has_fixable checks for remaining fixable diagnostics without
         applying any changes to disk or skill objects."""
-        from skillscheck.fixer import has_fixable
+        from skillcheck.fixer import has_fixable
 
         skill = _make_skill(tmp_path, "wrong-dir", "correct-dir")
         sd = SkillDiagnostics(

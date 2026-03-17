@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 
-from skillscheck.parser import parse_skill, discover_skills, _split_frontmatter
+from skillcheck.parser import parse_skill, discover_skills, _split_frontmatter
 
 
 class TestSplitFrontmatter:

@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 
 
-from skillscheck.validator import validate
-from skillscheck.models import Level, SkillDiagnostics
+from skillcheck.validator import validate
+from skillcheck.models import Level, SkillDiagnostics
 
 
 def _all_diags(result):
@@ -240,7 +240,7 @@ class TestValidationResult:
         assert c["errors"] >= 1
 
     def test_add_skill_creates_entry(self):
-        from skillscheck.models import ValidationResult, Diagnostic, Level
+        from skillcheck.models import ValidationResult, Diagnostic, Level
 
         result = ValidationResult()
         result.add_skill("test", "spec", Diagnostic(Level.ERROR, "test.check", "msg"))
@@ -248,7 +248,7 @@ class TestValidationResult:
         assert len(result.skills["test"].spec) == 1
 
     def test_add_skill_different_categories(self):
-        from skillscheck.models import ValidationResult, Diagnostic, Level
+        from skillcheck.models import ValidationResult, Diagnostic, Level
 
         result = ValidationResult()
         result.add_skill(
@@ -267,7 +267,7 @@ class TestValidationResult:
         assert len(sd.all()) == 3
 
     def test_skill_diagnostics_to_dict(self):
-        from skillscheck.models import Diagnostic, Level
+        from skillcheck.models import Diagnostic, Level
 
         sd = SkillDiagnostics()
         sd.spec.append(Diagnostic(Level.ERROR, "1b.name", "bad name"))
@@ -278,7 +278,7 @@ class TestValidationResult:
         assert "disclosure" not in d
 
     def test_add_agent_creates_entry(self):
-        from skillscheck.models import ValidationResult, Diagnostic, Level
+        from skillcheck.models import ValidationResult, Diagnostic, Level
 
         result = ValidationResult()
         result.add_agent("claude", Diagnostic(Level.WARNING, "test.check", "msg"))
@@ -286,7 +286,7 @@ class TestValidationResult:
         assert len(result.agents["claude"]) == 1
 
     def test_diagnostic_to_dict(self):
-        from skillscheck.models import Diagnostic, Level
+        from skillcheck.models import Diagnostic, Level
 
         d = Diagnostic(
             Level.ERROR,
@@ -305,7 +305,7 @@ class TestValidationResult:
         assert dd["source_url"] == "http://example.com"
 
     def test_diagnostic_to_dict_minimal(self):
-        from skillscheck.models import Diagnostic, Level
+        from skillcheck.models import Diagnostic, Level
 
         d = Diagnostic(Level.INFO, "test", "msg")
         dd = d.to_dict()

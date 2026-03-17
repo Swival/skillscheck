@@ -1,11 +1,11 @@
-# skillscheck - a linter for SKILL.md files
+# skillcheck - a linter for SKILL.md files
 
 A CLI tool that validates agent skill directories against the [agentskills.io specification](https://agentskills.io/specification) and checks compatibility with AI coding agents (Claude Code, Gemini CLI, Codex, Copilot, Cursor, Roo Code, Windsurf, Swival).
 
 ## Installation / Usage
 
 ```sh
-uvx skillscheck /path/to/skills-repo
+uvx skillcheck /path/to/skills-repo
 ```
 
 ### Options

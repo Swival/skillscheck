@@ -1,5 +1,5 @@
 [project]
-name = "skillscheck"
+name = "skillcheck"
 version = "0.1.1"
 description = "Validate agent skills against the agentskills.io specification"
 readme = "README.md"
@@ -31,18 +31,18 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = "https://github.com/swival/skillscheck"
-Issues = "https://github.com/swival/skillscheck/issues"
+Repository = "https://github.com/swival/skillcheck"
+Issues = "https://github.com/swival/skillcheck/issues"
 
 [project.scripts]
-skillscheck = "skillscheck.cli:main"
+skillcheck = "skillcheck.cli:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["skillscheck"]
+packages = ["skillcheck"]
 
 [tool.uv]
 package = true

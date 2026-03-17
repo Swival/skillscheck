@@ -9,16 +9,16 @@ test:
 	uv run python -m pytest tests/ -v
 
 lint:
-	uv run ruff check skillscheck/ tests/
+	uv run ruff check skillcheck/ tests/
 
 format:
-	uv run ruff format skillscheck/ tests/
+	uv run ruff format skillcheck/ tests/
 
 check: lint
-	uv run ruff format --check skillscheck/ tests/
+	uv run ruff format --check skillcheck/ tests/
 
 clean:
-	rm -rf dist/ __pycache__ skillscheck/__pycache__ tests/__pycache__ .pytest_cache
+	rm -rf dist/ __pycache__ skillcheck/__pycache__ tests/__pycache__ .pytest_cache
 	find . -name '*.pyc' -delete
 
 dist: clean

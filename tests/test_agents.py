@@ -5,16 +5,16 @@ import json
 
 import yaml
 
-from skillscheck.agents.claude import ClaudeAdapter
-from skillscheck.agents.codex import CodexAdapter
-from skillscheck.agents.copilot import CopilotAdapter
-from skillscheck.agents.cursor import CursorAdapter
-from skillscheck.agents.gemini import GeminiAdapter
-from skillscheck.agents.roo import RooAdapter
-from skillscheck.agents.swival import SwivalAdapter
-from skillscheck.agents.windsurf import WindsurfAdapter
-from skillscheck.agents import get_adapters, cross_agent_check, ALL_ADAPTERS
-from skillscheck.models import Level, SkillInfo
+from skillcheck.agents.claude import ClaudeAdapter
+from skillcheck.agents.codex import CodexAdapter
+from skillcheck.agents.copilot import CopilotAdapter
+from skillcheck.agents.cursor import CursorAdapter
+from skillcheck.agents.gemini import GeminiAdapter
+from skillcheck.agents.roo import RooAdapter
+from skillcheck.agents.swival import SwivalAdapter
+from skillcheck.agents.windsurf import WindsurfAdapter
+from skillcheck.agents import get_adapters, cross_agent_check, ALL_ADAPTERS
+from skillcheck.models import Level, SkillInfo
 
 
 def _has_check(diags, check_prefix):

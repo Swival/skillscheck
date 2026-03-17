@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 
-from skillscheck.parser import parse_skill
-from skillscheck.checks.spec import check_skill, check_cross_skill
-from skillscheck.models import Level
+from skillcheck.parser import parse_skill
+from skillcheck.checks.spec import check_skill, check_cross_skill
+from skillcheck.models import Level
 
 
 def _diag_checks(diags):
@@ -465,7 +465,7 @@ class TestAllowedToolsStale:
 
 class TestCrossSkill:
     def test_duplicate_names(self, fixture_path):
-        from skillscheck.models import SkillInfo
+        from skillcheck.models import SkillInfo
 
         s1 = SkillInfo(
             dir_name="skill-a",
@@ -483,7 +483,7 @@ class TestCrossSkill:
         assert _has_check(diags, "1g.duplicate-name")
 
     def test_no_duplicates(self, fixture_path):
-        from skillscheck.models import SkillInfo
+        from skillcheck.models import SkillInfo
 
         s1 = SkillInfo(
             dir_name="skill-a",
@@ -501,7 +501,7 @@ class TestCrossSkill:
         assert not _has_check(diags, "1g.duplicate-name")
 
     def test_duplicate_description_warning(self):
-        from skillscheck.models import SkillInfo
+        from skillcheck.models import SkillInfo
 
         s1 = SkillInfo(
             dir_name="skill-a",
@@ -519,7 +519,7 @@ class TestCrossSkill:
         assert _has_check(diags, "1g.duplicate-description")
 
     def test_different_descriptions_no_warning(self):
-        from skillscheck.models import SkillInfo
+        from skillcheck.models import SkillInfo
 
         s1 = SkillInfo(
             dir_name="skill-a",
@@ -537,7 +537,7 @@ class TestCrossSkill:
         assert not _has_check(diags, "1g.duplicate-description")
 
     def test_duplicate_description_case_insensitive(self):
-        from skillscheck.models import SkillInfo
+        from skillcheck.models import SkillInfo
 
         s1 = SkillInfo(
             dir_name="skill-a",
