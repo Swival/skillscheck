@@ -1,6 +1,6 @@
 [project]
 name = "skillcheck"
-version = "0.1.1"
+version = "0.9.0"
 description = "Validate agent skills against the agentskills.io specification"
 readme = "README.md"
 license = "MIT"
