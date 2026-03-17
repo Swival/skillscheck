@@ -1,6 +1,6 @@
 # skillcheck - a linter for SKILL.md files
 
-A CLI tool that validates agent skill directories against the [agentskills.io specification](https://agentskills.io/specification) and checks compatibility with AI coding agents (Claude Code, Gemini CLI, Codex, Copilot, Cursor, Roo Code, Windsurf, Swival).
+A CLI tool that validates agent skill directories against the [agentskills.io specification](https://agentskills.io/specification) and checks compatibility with AI coding agents (Claude Code, Codex, Copilot, Cursor, Gemini CLI, Roo Code, Swival, Windsurf).
 
 ## Installation / Usage
 
@@ -10,18 +10,18 @@ uvx skillcheck /path/to/skills-repo
 
 ### Options
 
+- `--agents claude,codex,copilot,cursor,gemini,roo,swival,windsurf`: run specific agent adapter checks (auto-detects if omitted, or `all`)
+- `--check agents,disclosure,quality,spec`: run specific check categories
+- `--fix`: auto-fix issues that have safe mechanical fixes (lowercase names, collapse consecutive hyphens, rename directories to match name field)
 - `--format json`: JSON output for CI pipelines
 - `--strict`: treat warnings as errors (exit 1)
-- `--fix`: auto-fix issues that have safe mechanical fixes (lowercase names, collapse consecutive hyphens, rename directories to match name field)
-- `--agents claude,gemini,codex,copilot,cursor,roo,windsurf,swival`: run specific agent adapter checks (auto-detects if omitted, or `all`)
-- `--check spec,quality,disclosure,agents`: run specific check categories
 
 ### Check categories
 
-- `spec`: core specification compliance (frontmatter fields, naming, directory structure)
-- `quality`: description quality, file hygiene, broken links, secret detection
+- `agents`: agent-specific config validation (Claude plugin.json, Codex openai.yaml, Copilot/Cursor/Gemini extension.json, Roo/Swival/Windsurf conventions)
 - `disclosure`: progressive disclosure (reference file sizing, nesting depth)
-- `agents`: agent-specific config validation (Claude plugin.json, Gemini extension.json, Codex openai.yaml, Copilot/Cursor/Roo/Windsurf/Swival conventions)
+- `quality`: description quality, file hygiene, broken links, secret detection
+- `spec`: core specification compliance (frontmatter fields, naming, directory structure)
 
 ### Exit codes
 

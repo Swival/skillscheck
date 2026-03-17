@@ -30,17 +30,6 @@ LEVEL_COLORS = {
     "directory", type=click.Path(exists=True, file_okay=False, resolve_path=True)
 )
 @click.option(
-    "--format",
-    "fmt",
-    type=click.Choice(["text", "json"]),
-    default="text",
-    help="Output format.",
-)
-@click.option("--strict", is_flag=True, help="Treat warnings as errors (exit 1).")
-@click.option(
-    "--fix", is_flag=True, help="Auto-fix issues that have safe mechanical fixes."
-)
-@click.option(
     "--agents",
     "agent_names",
     default=None,
@@ -50,8 +39,19 @@ LEVEL_COLORS = {
     "--check",
     "check_names",
     default=None,
-    help="Comma-separated check categories: spec, quality, disclosure, agents.",
+    help="Comma-separated check categories: agents, disclosure, quality, spec.",
 )
+@click.option(
+    "--fix", is_flag=True, help="Auto-fix issues that have safe mechanical fixes."
+)
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["text", "json"]),
+    default="text",
+    help="Output format.",
+)
+@click.option("--strict", is_flag=True, help="Treat warnings as errors (exit 1).")
 def main(
     directory: str,
     fmt: str,
