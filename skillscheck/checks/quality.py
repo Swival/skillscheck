@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+from collections.abc import Iterator
 from pathlib import Path
 
 from ..models import Diagnostic, Level, SPEC_URL, SkillInfo
@@ -96,6 +97,8 @@ def check_skill(skill: SkillInfo) -> list[Diagnostic]:
     diags.extend(_check_file_hygiene(skill))
     diags.extend(_check_links(skill))
     diags.extend(_check_unclosed_fences(skill))
+    diags.extend(_check_reference_links(skill))
+    diags.extend(_check_reference_fragment_links(skill))
     diags.extend(_check_orphan_files(skill))
     return diags
 
@@ -402,12 +405,67 @@ def _check_fragment_links(skill: SkillInfo, skill_dir: Path) -> list[Diagnostic]
     return diags
 
 
+_DISCLOSURE_SUBDIRS = ("references", "scripts", "assets")
+
+_NON_LOCAL_SCHEMES = ("http://", "https://", "mailto:", "tel:", "ftp://")
+
+
+def _iter_disclosure_md_files(skill_dir: Path) -> Iterator[Path]:
+    """Yield every .md file under references/, scripts/, assets/ recursively.
+
+    Uses a case-insensitive suffix match so `.MD` is picked up on
+    case-sensitive filesystems.
+    """
+    for name in _DISCLOSURE_SUBDIRS:
+        d = skill_dir / name
+        if not d.is_dir():
+            continue
+        for p in sorted(d.rglob("*")):
+            if p.is_file() and p.suffix.lower() == ".md":
+                yield p
+
+
+def _resolve_skill_local_link(
+    base_dir: Path,
+    target: str,
+    skill_root: Path,
+) -> tuple[Path | None, bool]:
+    """Resolve a markdown link target to a normalized filesystem path.
+
+    Returns (resolved_path, escapes).
+
+    - resolved_path is None when the target is not a local file link:
+      http/https/mailto/tel/ftp schemes, scheme-relative `//host/...`,
+      or an empty string.
+    - escapes is True when the target points outside skill_root. Absolute
+      filesystem paths (`/etc/...`) always count as escaping. After
+      resolution, paths that lie outside skill_root — including through
+      symlinks — also count as escaping. base_dir and skill_root must
+      both be already-resolved Paths.
+    """
+    if not target:
+        return None, False
+    lowered = target.lower()
+    if lowered.startswith(_NON_LOCAL_SCHEMES):
+        return None, False
+    if target.startswith("//"):
+        return None, False
+    if target.startswith("/"):
+        return None, True
+
+    resolved = (base_dir / target).resolve(strict=False)
+    try:
+        resolved.relative_to(skill_root)
+    except ValueError:
+        return resolved, True
+    return resolved, False
+
+
 def _check_unclosed_fences(skill: SkillInfo) -> list[Diagnostic]:
-    """Check for unclosed code fences in SKILL.md and reference markdown files."""
+    """Check for unclosed code fences in SKILL.md and disclosure markdown files."""
     diags: list[Diagnostic] = []
     path = skill.skill_md_path
 
-    # Check SKILL.md body
     fence_line = find_unclosed_fence(skill.body)
     if fence_line is not None:
         diags.append(
@@ -422,30 +480,142 @@ def _check_unclosed_fences(skill: SkillInfo) -> list[Diagnostic]:
             )
         )
 
-    # Check markdown files in references/
     skill_dir = Path(skill.dir_path)
-    refs_dir = skill_dir / "references"
-    if refs_dir.is_dir():
-        for entry in sorted(refs_dir.iterdir()):
-            if entry.is_file() and entry.suffix.lower() == ".md":
-                try:
-                    content = entry.read_text(encoding="utf-8", errors="ignore")
-                except OSError:
-                    continue
-                fence_line = find_unclosed_fence(content)
-                if fence_line is not None:
-                    rel = entry.relative_to(skill_dir)
+    for entry in _iter_disclosure_md_files(skill_dir):
+        try:
+            content = entry.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        fence_line = find_unclosed_fence(content)
+        if fence_line is not None:
+            rel = entry.relative_to(skill_dir)
+            diags.append(
+                Diagnostic(
+                    Level.ERROR,
+                    "2d.unclosed-fence",
+                    f"'{rel}' has an unclosed code fence starting at "
+                    f"line {fence_line} — agents may misinterpret "
+                    f"everything after it as code",
+                    path=str(entry),
+                    line=fence_line,
+                )
+            )
+
+    return diags
+
+
+def _check_reference_links(skill: SkillInfo) -> list[Diagnostic]:
+    """Validate local markdown links inside disclosure files.
+
+    Mirrors `_check_links` but operates per-file: link targets in
+    `references/foo.md` resolve relative to that file's directory, not
+    the skill root.
+    """
+    diags: list[Diagnostic] = []
+    skill_dir = Path(skill.dir_path)
+    skill_root = skill_dir.resolve()
+
+    for ref_file in _iter_disclosure_md_files(skill_dir):
+        try:
+            content = ref_file.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        base_dir = ref_file.parent.resolve()
+        rel_ref = ref_file.relative_to(skill_dir)
+
+        for target in extract_local_link_targets(content):
+            resolved, escapes = _resolve_skill_local_link(
+                base_dir, target, skill_root
+            )
+            if escapes:
+                diags.append(
+                    Diagnostic(
+                        Level.INFO,
+                        "2c.escapes-skill",
+                        f"'{rel_ref}': link target '{target}' resolves "
+                        "outside the skill directory",
+                        path=str(ref_file),
+                    )
+                )
+                continue
+            if resolved is None:
+                continue
+            if not resolved.exists():
+                diags.append(
+                    Diagnostic(
+                        Level.WARNING,
+                        "2c.broken-link",
+                        f"'{rel_ref}': link target '{target}' does not exist",
+                        path=str(ref_file),
+                    )
+                )
+
+    return diags
+
+
+def _check_reference_fragment_links(skill: SkillInfo) -> list[Diagnostic]:
+    """Validate fragment links inside disclosure files.
+
+    Self-fragments resolve against the reference file's own headings.
+    File+fragment links resolve relative to the reference file's
+    directory. Targets that escape the skill or do not exist are
+    silently skipped — `_check_reference_links` already reported them.
+    """
+    diags: list[Diagnostic] = []
+    skill_dir = Path(skill.dir_path)
+    skill_root = skill_dir.resolve()
+    headings_cache: dict[Path, set[str]] = {}
+
+    for ref_file in _iter_disclosure_md_files(skill_dir):
+        try:
+            content = ref_file.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        base_dir = ref_file.parent.resolve()
+        rel_ref = ref_file.relative_to(skill_dir)
+        self_headings: set[str] | None = None
+
+        for path_part, fragment in extract_fragment_links(content):
+            if not path_part:
+                if self_headings is None:
+                    self_headings = extract_headings(content)
+                if fragment not in self_headings:
                     diags.append(
                         Diagnostic(
-                            Level.ERROR,
-                            "2d.unclosed-fence",
-                            f"'{rel}' has an unclosed code fence starting at "
-                            f"line {fence_line} — agents may misinterpret "
-                            f"everything after it as code",
-                            path=str(entry),
-                            line=fence_line,
+                            Level.WARNING,
+                            "2c.broken-link.fragment",
+                            f"'{rel_ref}': fragment '#{fragment}' does not "
+                            "match any heading in this file",
+                            path=str(ref_file),
                         )
                     )
+                continue
+
+            resolved, escapes = _resolve_skill_local_link(
+                base_dir, path_part, skill_root
+            )
+            if escapes or resolved is None:
+                continue
+            if not resolved.is_file():
+                continue
+            if resolved not in headings_cache:
+                try:
+                    target_content = resolved.read_text(
+                        encoding="utf-8", errors="ignore"
+                    )
+                except OSError:
+                    continue
+                headings_cache[resolved] = extract_headings(target_content)
+            if fragment not in headings_cache[resolved]:
+                diags.append(
+                    Diagnostic(
+                        Level.WARNING,
+                        "2c.broken-link.fragment",
+                        f"'{rel_ref}': fragment '#{fragment}' does not "
+                        f"match any heading in '{path_part}'",
+                        path=str(ref_file),
+                    )
+                )
 
     return diags
 

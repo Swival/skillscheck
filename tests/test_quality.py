@@ -567,6 +567,184 @@ class TestUnclosedFences:
         assert _has_check(_errors(diags), "2d.unclosed-fence")
 
 
+class TestReferenceLinks:
+    def test_broken_path_link_warning(self, tmp_path):
+        body = "# Title\n\nSee [guide](references/guide.md)."
+        d = _make_skill_dir(tmp_path, "broken-ref-link", body=body)
+        (d / "references").mkdir()
+        (d / "references" / "guide.md").write_text(
+            "# Guide\n\nSee [more](./missing.md)."
+        )
+        diags = check_skill(parse_skill(d))
+        warnings = _warnings(diags)
+        broken = [d for d in warnings if d.check == "2c.broken-link"]
+        assert any("missing.md" in d.message for d in broken)
+
+    def test_self_fragment_broken_warning(self, tmp_path):
+        body = "# Title\n\nSee [guide](references/guide.md)."
+        d = _make_skill_dir(tmp_path, "ref-self-frag", body=body)
+        (d / "references").mkdir()
+        (d / "references" / "guide.md").write_text(
+            "# Guide\n\n## Intro\n\nSee [x](#nope)."
+        )
+        diags = check_skill(parse_skill(d))
+        warnings = _warnings(diags)
+        assert _has_check(warnings, "2c.broken-link.fragment")
+
+    def test_cross_file_fragment_ok(self, tmp_path):
+        body = (
+            "# Title\n\nSee [a](references/a.md) and [b](references/b.md)."
+        )
+        d = _make_skill_dir(tmp_path, "cross-frag-ok", body=body)
+        (d / "references").mkdir()
+        (d / "references" / "a.md").write_text(
+            "# A\n\nGo to [section](b.md#section-two)."
+        )
+        (d / "references" / "b.md").write_text(
+            "# B\n\n## Section Two\n\nHello."
+        )
+        diags = check_skill(parse_skill(d))
+        assert not _has_check(diags, "2c.broken-link.fragment")
+
+    def test_cross_file_fragment_bad(self, tmp_path):
+        body = (
+            "# Title\n\nSee [a](references/a.md) and [b](references/b.md)."
+        )
+        d = _make_skill_dir(tmp_path, "cross-frag-bad", body=body)
+        (d / "references").mkdir()
+        (d / "references" / "a.md").write_text(
+            "# A\n\nGo to [section](b.md#section-three)."
+        )
+        (d / "references" / "b.md").write_text(
+            "# B\n\n## Section Two\n\nHello."
+        )
+        diags = check_skill(parse_skill(d))
+        warnings = _warnings(diags)
+        frag = [d for d in warnings if d.check == "2c.broken-link.fragment"]
+        assert any("section-three" in d.message for d in frag)
+
+    def test_escapes_skill_relative(self, tmp_path):
+        body = "# Title\n\nSee [guide](references/guide.md)."
+        d = _make_skill_dir(tmp_path, "ref-escape-rel", body=body)
+        (d / "references").mkdir()
+        (d / "references" / "guide.md").write_text(
+            "# Guide\n\nSee [outside](../../outside.md)."
+        )
+        diags = check_skill(parse_skill(d))
+        assert _has_check(_infos(diags), "2c.escapes-skill")
+        assert not any(
+            "../../outside.md" in x.message
+            for x in diags
+            if x.check == "2c.broken-link"
+        )
+
+    def test_escapes_skill_absolute(self, tmp_path):
+        body = "# Title\n\nSee [guide](references/guide.md)."
+        d = _make_skill_dir(tmp_path, "ref-escape-abs", body=body)
+        (d / "references").mkdir()
+        (d / "references" / "guide.md").write_text(
+            "# Guide\n\nSee [host](/etc/passwd)."
+        )
+        diags = check_skill(parse_skill(d))
+        assert _has_check(_infos(diags), "2c.escapes-skill")
+
+    def test_scheme_relative_url_skipped(self, tmp_path):
+        body = "# Title\n\nSee [guide](references/guide.md)."
+        d = _make_skill_dir(tmp_path, "ref-scheme-rel", body=body)
+        (d / "references").mkdir()
+        (d / "references" / "guide.md").write_text(
+            "# Guide\n\nSee [host](//example.test/x)."
+        )
+        diags = check_skill(parse_skill(d))
+        assert not _has_check(diags, "2c.escapes-skill")
+        assert not _has_check(diags, "2c.broken-link")
+
+    def test_external_url_in_reference_ignored(self, tmp_path):
+        body = "# Title\n\nSee [guide](references/guide.md)."
+        d = _make_skill_dir(tmp_path, "ref-external", body=body)
+        (d / "references").mkdir()
+        (d / "references" / "guide.md").write_text(
+            "# Guide\n\nSee [docs](https://example.com/x)."
+        )
+        diags = check_skill(parse_skill(d))
+        assert not _has_check(diags, "2c.broken-link")
+        assert not _has_check(diags, "2c.escapes-skill")
+
+    def test_uppercase_external_scheme_ignored(self, tmp_path):
+        body = "# Title\n\nSee [guide](references/guide.md)."
+        d = _make_skill_dir(tmp_path, "ref-upper-scheme", body=body)
+        (d / "references").mkdir()
+        (d / "references" / "guide.md").write_text(
+            "# Guide\n\nSee [docs](HTTPS://example.com/x) "
+            "and [mail](MAILTO:a@b.test)."
+        )
+        diags = check_skill(parse_skill(d))
+        assert not _has_check(diags, "2c.broken-link")
+        assert not _has_check(diags, "2c.escapes-skill")
+
+    def test_fragment_link_escapes_skill_no_frag_diag(self, tmp_path):
+        body = "# Title\n\nSee [guide](references/guide.md)."
+        d = _make_skill_dir(tmp_path, "ref-frag-escape", body=body)
+        (d / "references").mkdir()
+        (d / "references" / "guide.md").write_text(
+            "# Guide\n\nSee [outside](../../outside.md#anchor)."
+        )
+        diags = check_skill(parse_skill(d))
+        assert _has_check(_infos(diags), "2c.escapes-skill")
+        assert not _has_check(diags, "2c.broken-link.fragment")
+
+    def test_link_to_sibling_directory_exists(self, tmp_path):
+        body = "# Title\n\nSee [a](references/a.md), [s](scripts/s.sh)."
+        d = _make_skill_dir(tmp_path, "ref-sibling", body=body)
+        (d / "references").mkdir()
+        (d / "scripts").mkdir()
+        (d / "scripts" / "s.sh").write_text("echo hi")
+        (d / "references" / "a.md").write_text(
+            "# A\n\nRun [script](../scripts/s.sh)."
+        )
+        diags = check_skill(parse_skill(d))
+        assert not _has_check(diags, "2c.broken-link")
+        assert not _has_check(diags, "2c.escapes-skill")
+
+
+class TestDisclosureFenceCoverage:
+    def test_nested_reference_fence(self, tmp_path):
+        body = "# Title\n\nSee [deep](references/sub/deep.md)."
+        d = _make_skill_dir(tmp_path, "nested-fence", body=body)
+        (d / "references" / "sub").mkdir(parents=True)
+        (d / "references" / "sub" / "deep.md").write_text(
+            "# Deep\n\n```\nunclosed\n"
+        )
+        diags = check_skill(parse_skill(d))
+        assert _has_check(_errors(diags), "2d.unclosed-fence")
+
+    def test_scripts_md_fence(self, tmp_path):
+        body = "# Title\n\nSee [run](scripts/run.md)."
+        d = _make_skill_dir(tmp_path, "scripts-fence", body=body)
+        (d / "scripts").mkdir()
+        (d / "scripts" / "run.md").write_text("# Run\n\n```\nunclosed\n")
+        diags = check_skill(parse_skill(d))
+        assert _has_check(_errors(diags), "2d.unclosed-fence")
+
+    def test_assets_md_fence(self, tmp_path):
+        body = "# Title\n\nSee [a](assets/notes.md)."
+        d = _make_skill_dir(tmp_path, "assets-fence", body=body)
+        (d / "assets").mkdir()
+        (d / "assets" / "notes.md").write_text("# Notes\n\n```\nunclosed\n")
+        diags = check_skill(parse_skill(d))
+        assert _has_check(_errors(diags), "2d.unclosed-fence")
+
+    def test_uppercase_md_suffix_fence(self, tmp_path):
+        body = "# Title\n\nSee [g](references/Guide.MD)."
+        d = _make_skill_dir(tmp_path, "uppercase-md", body=body)
+        (d / "references").mkdir()
+        (d / "references" / "Guide.MD").write_text(
+            "# Guide\n\n```\nunclosed\n"
+        )
+        diags = check_skill(parse_skill(d))
+        assert _has_check(_errors(diags), "2d.unclosed-fence")
+
+
 class TestOrphanFiles:
     def test_referenced_file_no_warning(self, tmp_path):
         body = "# Title\n\nRun [extract](scripts/extract.py) to process."
