@@ -524,9 +524,7 @@ def _check_reference_links(skill: SkillInfo) -> list[Diagnostic]:
         rel_ref = ref_file.relative_to(skill_dir)
 
         for target in extract_local_link_targets(content):
-            resolved, escapes = _resolve_skill_local_link(
-                base_dir, target, skill_root
-            )
+            resolved, escapes = _resolve_skill_local_link(base_dir, target, skill_root)
             if escapes:
                 diags.append(
                     Diagnostic(

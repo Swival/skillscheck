@@ -592,32 +592,24 @@ class TestReferenceLinks:
         assert _has_check(warnings, "2c.broken-link.fragment")
 
     def test_cross_file_fragment_ok(self, tmp_path):
-        body = (
-            "# Title\n\nSee [a](references/a.md) and [b](references/b.md)."
-        )
+        body = "# Title\n\nSee [a](references/a.md) and [b](references/b.md)."
         d = _make_skill_dir(tmp_path, "cross-frag-ok", body=body)
         (d / "references").mkdir()
         (d / "references" / "a.md").write_text(
             "# A\n\nGo to [section](b.md#section-two)."
         )
-        (d / "references" / "b.md").write_text(
-            "# B\n\n## Section Two\n\nHello."
-        )
+        (d / "references" / "b.md").write_text("# B\n\n## Section Two\n\nHello.")
         diags = check_skill(parse_skill(d))
         assert not _has_check(diags, "2c.broken-link.fragment")
 
     def test_cross_file_fragment_bad(self, tmp_path):
-        body = (
-            "# Title\n\nSee [a](references/a.md) and [b](references/b.md)."
-        )
+        body = "# Title\n\nSee [a](references/a.md) and [b](references/b.md)."
         d = _make_skill_dir(tmp_path, "cross-frag-bad", body=body)
         (d / "references").mkdir()
         (d / "references" / "a.md").write_text(
             "# A\n\nGo to [section](b.md#section-three)."
         )
-        (d / "references" / "b.md").write_text(
-            "# B\n\n## Section Two\n\nHello."
-        )
+        (d / "references" / "b.md").write_text("# B\n\n## Section Two\n\nHello.")
         diags = check_skill(parse_skill(d))
         warnings = _warnings(diags)
         frag = [d for d in warnings if d.check == "2c.broken-link.fragment"]
@@ -675,8 +667,7 @@ class TestReferenceLinks:
         d = _make_skill_dir(tmp_path, "ref-upper-scheme", body=body)
         (d / "references").mkdir()
         (d / "references" / "guide.md").write_text(
-            "# Guide\n\nSee [docs](HTTPS://example.com/x) "
-            "and [mail](MAILTO:a@b.test)."
+            "# Guide\n\nSee [docs](HTTPS://example.com/x) and [mail](MAILTO:a@b.test)."
         )
         diags = check_skill(parse_skill(d))
         assert not _has_check(diags, "2c.broken-link")
@@ -699,9 +690,7 @@ class TestReferenceLinks:
         (d / "references").mkdir()
         (d / "scripts").mkdir()
         (d / "scripts" / "s.sh").write_text("echo hi")
-        (d / "references" / "a.md").write_text(
-            "# A\n\nRun [script](../scripts/s.sh)."
-        )
+        (d / "references" / "a.md").write_text("# A\n\nRun [script](../scripts/s.sh).")
         diags = check_skill(parse_skill(d))
         assert not _has_check(diags, "2c.broken-link")
         assert not _has_check(diags, "2c.escapes-skill")
@@ -712,9 +701,7 @@ class TestDisclosureFenceCoverage:
         body = "# Title\n\nSee [deep](references/sub/deep.md)."
         d = _make_skill_dir(tmp_path, "nested-fence", body=body)
         (d / "references" / "sub").mkdir(parents=True)
-        (d / "references" / "sub" / "deep.md").write_text(
-            "# Deep\n\n```\nunclosed\n"
-        )
+        (d / "references" / "sub" / "deep.md").write_text("# Deep\n\n```\nunclosed\n")
         diags = check_skill(parse_skill(d))
         assert _has_check(_errors(diags), "2d.unclosed-fence")
 
@@ -738,9 +725,7 @@ class TestDisclosureFenceCoverage:
         body = "# Title\n\nSee [g](references/Guide.MD)."
         d = _make_skill_dir(tmp_path, "uppercase-md", body=body)
         (d / "references").mkdir()
-        (d / "references" / "Guide.MD").write_text(
-            "# Guide\n\n```\nunclosed\n"
-        )
+        (d / "references" / "Guide.MD").write_text("# Guide\n\n```\nunclosed\n")
         diags = check_skill(parse_skill(d))
         assert _has_check(_errors(diags), "2d.unclosed-fence")
 
