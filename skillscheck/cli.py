@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+from importlib.metadata import version
 from pathlib import Path
 
 import click
@@ -26,6 +27,7 @@ LEVEL_COLORS = {
 
 
 @click.command()
+@click.version_option(version("skillscheck"), "-V", "--version")
 @click.argument(
     "directory", type=click.Path(exists=True, file_okay=False, resolve_path=True)
 )
