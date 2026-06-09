@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-import unicodedata
 
 FENCED_BLOCK_RE = re.compile(r"^(`{3,}|~{3,})", re.MULTILINE)
 INLINE_CODE_RE = re.compile(r"`[^`]+`")
@@ -14,9 +13,20 @@ SETEXT_H2_RE = re.compile(r"^(.+)\n-+\s*$", re.MULTILINE)
 
 
 def strip_code(text: str) -> str:
+    text = strip_code_blocks(text)
+    text = INLINE_CODE_RE.sub("", text)
+    return text
+
+
+def strip_code_blocks(text: str) -> str:
+    """Remove fenced and indented code blocks but leave inline code intact.
+
+    Heading slugs keep the visible text of inline code (an inline span like
+    xqd_cache.go contributes "xqd_cachego"), so heading extraction strips only
+    block-level code, never inline spans.
+    """
     text = _strip_fenced_blocks(text)
     text = _strip_indented_blocks(text)
-    text = INLINE_CODE_RE.sub("", text)
     return text
 
 
@@ -70,14 +80,20 @@ def _strip_indented_blocks(text: str) -> str:
 
 
 def slugify_heading(text: str) -> str:
-    """Convert a markdown heading to a GitHub-style anchor slug."""
-    text = INLINE_CODE_RE.sub("", text)
+    """Convert a markdown heading to a GitHub-style anchor slug.
+
+    Mirrors markdownlint's MD051 (and GitHub's) algorithm: inline code and link
+    syntax are reduced to their visible text, the result is lowercased, every
+    character outside word characters, spaces, and hyphens is dropped, and each
+    remaining space becomes a single hyphen. Whitespace runs are NOT collapsed,
+    so two spaces left behind by a removed em dash produce two hyphens.
+    """
+    text = re.sub(r"`([^`]+)`", r"\1", text)
     text = re.sub(r"!\[([^\]]*)\]\([^)]+\)", r"\1", text)
     text = re.sub(r"\[([^\]]*)\]\([^)]+\)", r"\1", text)
     text = text.lower()
-    text = unicodedata.normalize("NFKD", text)
-    text = re.sub(r"[^\w\s-]", "", text)
-    text = re.sub(r"[\s]+", "-", text.strip())
+    text = re.sub(r"[^\w\- ]", "", text)
+    text = text.replace(" ", "-")
     return text
 
 
@@ -87,7 +103,7 @@ def extract_headings(text: str) -> set[str]:
     Generates GitHub-style suffixed slugs for duplicate headings
     (e.g. ``intro``, ``intro-1``, ``intro-2``).
     """
-    clean = strip_code(text)
+    clean = strip_code_blocks(text)
     slugs: set[str] = set()
     counts: dict[str, int] = {}
 
