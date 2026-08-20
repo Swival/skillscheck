@@ -786,3 +786,209 @@ class TestOrphanFiles:
         assert len(orphans) == 2
         assert any("orphan.md" in m for m in orphan_paths)
         assert any("unused.sh" in m for m in orphan_paths)
+
+
+_ENTRY_SCHEMA = (
+    "# Reference architectures\n"
+    "\n"
+    "## vcl_shielding — custom origin shielding\n"
+    "- **Repo:** github.com/example/vcl_shielding\n"
+    "- **Source:** community (example)\n"
+    "- **Demonstrates:** shielding topology decisions.\n"
+    "- **Watch out for:** none known.\n"
+    "- **Last verified:** 2026-08-19\n"
+    "\n"
+    "## bulk-redirects — delivery routing\n"
+    "- **Repo:** github.com/example/bulk-redirects\n"
+    "- **Source:** community (example)\n"
+    "- **Demonstrates:** a redirect table in a Config Store.\n"
+    "- **Watch out for:** none known.\n"
+    "- **Last verified:** 2026-08-19\n"
+)
+
+_QUOTED_ENTRY_SCHEMA = "".join(
+    f"> {line}\n" if line else ">\n" for line in _ENTRY_SCHEMA.split("\n")
+)
+
+
+def _strong_diags(diags):
+    return [d for d in diags if d.check == "2e.excessive-strong"]
+
+
+def _reference_skill(tmp_path, name, content, filename="references/entries.md"):
+    """Create a skill whose SKILL.md links one disclosure file."""
+    d = _make_skill_dir(tmp_path, name, body=f"# Title\n\nSee [entries]({filename}).")
+    target = d / filename
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(content)
+    return d
+
+
+class TestExcessiveStrong:
+    def test_repeated_entry_schema_info(self, tmp_path):
+        d = _reference_skill(tmp_path, "entry-schema", _ENTRY_SCHEMA)
+        diags = _strong_diags(check_skill(parse_skill(d)))
+        assert len(diags) == 1
+        assert diags[0].level == Level.INFO
+        assert diags[0].path == str(d / "references" / "entries.md")
+        assert diags[0].line == 4
+        assert "'references/entries.md'" in diags[0].message
+        assert "repeats 5 bold field labels 10 times" in diags[0].message
+        assert "repo (2), source (2), demonstrates (2)" in diags[0].message
+
+    def test_quoted_entry_schema_info(self, tmp_path):
+        d = _reference_skill(tmp_path, "quoted-schema", _QUOTED_ENTRY_SCHEMA)
+        diags = _strong_diags(check_skill(parse_skill(d)))
+        assert len(diags) == 1
+        assert diags[0].line == 4
+
+    def test_four_plus_two_plus_two_triggers(self, tmp_path):
+        content = (
+            "- **Repo:** a\n"
+            "- **Repo:** b\n"
+            "- **Repo:** c\n"
+            "- **Repo:** d\n"
+            "- **Source:** e\n"
+            "- **Source:** f\n"
+            "- **Owner:** g\n"
+            "- **Owner:** h\n"
+        )
+        d = _reference_skill(tmp_path, "min-total", content)
+        diags = _strong_diags(check_skill(parse_skill(d)))
+        assert len(diags) == 1
+        assert "repeats 3 bold field labels 8 times" in diags[0].message
+
+    def test_three_labels_twice_is_below_the_total(self, tmp_path):
+        content = (
+            "- **Repo:** a\n"
+            "- **Source:** b\n"
+            "- **Owner:** c\n"
+            "\n"
+            "- **Repo:** d\n"
+            "- **Source:** e\n"
+            "- **Owner:** f\n"
+        )
+        d = _reference_skill(tmp_path, "below-total", content)
+        assert not _has_check(check_skill(parse_skill(d)), "2e.excessive-strong")
+
+    def test_two_labels_are_not_a_schema(self, tmp_path):
+        content = "".join(f"- **Repo:** {i}\n- **Source:** {i}\n" for i in range(5))
+        d = _reference_skill(tmp_path, "two-labels", content)
+        assert not _has_check(check_skill(parse_skill(d)), "2e.excessive-strong")
+
+    def test_eight_distinct_labels_once_each(self, tmp_path):
+        content = "".join(f"- **Field {i}:** value\n" for i in range(8))
+        d = _reference_skill(tmp_path, "distinct-labels", content)
+        assert not _has_check(check_skill(parse_skill(d)), "2e.excessive-strong")
+
+    def test_one_off_labels_do_not_count(self, tmp_path):
+        content = (
+            "- **Repo:** a\n"
+            "- **Source:** b\n"
+            "- **Owner:** c\n"
+            "\n"
+            "- **Repo:** d\n"
+            "- **Source:** e\n"
+            "- **Owner:** f\n"
+            "\n"
+            "- **Extra:** g\n"
+            "- **Other:** h\n"
+        )
+        d = _reference_skill(tmp_path, "one-off", content)
+        assert not _has_check(check_skill(parse_skill(d)), "2e.excessive-strong")
+
+    def test_repeated_setext_headings_stay_silent(self, tmp_path):
+        fields = ("Repo", "Source", "Demonstrates", "Watch out for", "Last verified")
+        content = "".join(f"**{name}:**\n{'-' * 12}\n\n" for name in fields * 2)
+        d = _reference_skill(tmp_path, "setext-schema", content)
+        assert not _has_check(check_skill(parse_skill(d)), "2e.excessive-strong")
+
+    def test_bold_term_checklist_stays_silent(self, tmp_path):
+        content = (
+            "# Review checklist\n"
+            "\n"
+            "- **Correctness**: does the logic do what it claims?\n"
+            "- **Error handling**: are errors propagated correctly?\n"
+            "- **Security**: no secret leakage in logs.\n"
+            "- **Test coverage**: are new code paths covered?\n"
+            "- **API compatibility**: do public interfaces break?\n"
+            "- **Performance**: any unnecessary allocation in hot paths?\n"
+            "- **Vendor directory**: are vendored files modified?\n"
+            "- **Documentation**: is the change described?\n"
+        )
+        d = _reference_skill(tmp_path, "checklist", content)
+        assert not _has_check(check_skill(parse_skill(d)), "2e.excessive-strong")
+
+    def test_table_cells_and_terminology_stay_silent(self, tmp_path):
+        content = (
+            "# Bot management\n"
+            "\n"
+            "| Field | Value |\n"
+            "| --- | --- |\n"
+            "| **Repo:** | github.com/example/a |\n"
+            "| **Source:** | community |\n"
+            "| **Demonstrates:** | shielding |\n"
+            "| **Last verified:** | 2026-08-19 |\n"
+            "| **Repo:** | github.com/example/b |\n"
+            "| **Source:** | official |\n"
+            "| **Demonstrates:** | routing |\n"
+            "| **Last verified:** | 2026-08-19 |\n"
+            "\n"
+            "Two options exist: **pre-cache** and **post-cache**.\n"
+            "\n"
+            "- **Client fingerprinting**: JA3/JA4 at the edge.\n"
+            "- **Verified bots**: allowlisting for search crawlers.\n"
+        )
+        d = _reference_skill(tmp_path, "table-cells", content)
+        assert not _has_check(check_skill(parse_skill(d)), "2e.excessive-strong")
+
+    def test_fenced_example_in_skill_md_stays_silent(self, tmp_path):
+        body = (
+            "# Title\n"
+            "\n"
+            "## Entry format\n"
+            "\n"
+            "Every entry in every reference file uses this schema:\n"
+            "\n"
+            "```markdown\n" + _ENTRY_SCHEMA + "```\n"
+        )
+        d = _make_skill_dir(tmp_path, "fenced-example", body=body)
+        assert not _has_check(check_skill(parse_skill(d)), "2e.excessive-strong")
+
+    def test_skill_md_line_includes_the_frontmatter_offset(self, tmp_path):
+        d = _make_skill_dir(tmp_path, "skill-schema", body=_ENTRY_SCHEMA)
+        diags = _strong_diags(check_skill(parse_skill(d)))
+        assert len(diags) == 1
+        assert diags[0].path == str(d / "SKILL.md")
+        assert diags[0].message.startswith("SKILL.md repeats 5 bold field labels")
+        lines = (d / "SKILL.md").read_text().split("\n")
+        assert lines[diags[0].line - 1].startswith("- **Repo:**")
+
+    def test_nested_disclosure_files_report_local_paths(self, tmp_path):
+        d = _make_skill_dir(
+            tmp_path,
+            "nested-schema",
+            body="# Title\n\nSee references/sub/deep.md, scripts/run.md, assets/notes.md.",
+        )
+        for rel in ("references/sub/deep.md", "scripts/run.md", "assets/notes.md"):
+            target = d / rel
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(_ENTRY_SCHEMA)
+        diags = _strong_diags(check_skill(parse_skill(d)))
+        assert len(diags) == 3
+        assert all(x.line == 4 for x in diags)
+        for rel in ("references/sub/deep.md", "scripts/run.md", "assets/notes.md"):
+            assert any(f"'{rel}'" in x.message for x in diags)
+
+    def test_uppercase_md_suffix_checked(self, tmp_path):
+        d = _reference_skill(
+            tmp_path, "uppercase-schema", _ENTRY_SCHEMA, "references/Entries.MD"
+        )
+        diags = _strong_diags(check_skill(parse_skill(d)))
+        assert len(diags) == 1
+
+    def test_parse_error_returns_empty(self, tmp_path):
+        skill_dir = tmp_path / "no-frontmatter"
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text(_ENTRY_SCHEMA)
+        assert check_skill(parse_skill(skill_dir)) == []

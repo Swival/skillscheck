@@ -1,4 +1,4 @@
-"""Quality checks (2a-2d)."""
+"""Quality checks (2a-2e)."""
 
 from __future__ import annotations
 
@@ -6,9 +6,11 @@ import os
 import re
 from collections.abc import Iterator
 from pathlib import Path
+from typing import NamedTuple
 
 from ..models import Diagnostic, Level, SPEC_URL, SkillInfo
 from ..mdutil import (
+    collect_strong_labels,
     extract_fragment_links,
     extract_headings,
     extract_local_link_targets,
@@ -99,6 +101,7 @@ def check_skill(skill: SkillInfo) -> list[Diagnostic]:
     diags.extend(_check_unclosed_fences(skill))
     diags.extend(_check_reference_links(skill))
     diags.extend(_check_reference_fragment_links(skill))
+    diags.extend(_check_excessive_strong(skill))
     diags.extend(_check_orphan_files(skill))
     return diags
 
@@ -614,6 +617,86 @@ def _check_reference_fragment_links(skill: SkillInfo) -> list[Diagnostic]:
                         path=str(ref_file),
                     )
                 )
+
+    return diags
+
+
+_MIN_LABEL_REPEATS = 2
+_MIN_DISTINCT_LABELS = 3
+_MIN_LABEL_TOTAL = 8
+_SAMPLE_LABELS = 3
+
+
+class _StrongSchema(NamedTuple):
+    distinct: int
+    total: int
+    line: int
+    sample: str
+
+
+def _repeated_strong_schema(text: str) -> _StrongSchema | None:
+    """Describe the repeated bold field schema of a file, if it has one."""
+    repeated = {
+        name: label
+        for name, label in collect_strong_labels(text).items()
+        if label.count >= _MIN_LABEL_REPEATS
+    }
+    total = sum(label.count for label in repeated.values())
+    if len(repeated) < _MIN_DISTINCT_LABELS or total < _MIN_LABEL_TOTAL:
+        return None
+
+    # Most repeated first, then in the order the schema introduces its fields.
+    ordered = sorted(repeated.items(), key=lambda kv: (-kv[1].count, kv[1].first_line))
+    sample = ", ".join(
+        f"{name} ({label.count})" for name, label in ordered[:_SAMPLE_LABELS]
+    )
+    line = min(label.first_line for label in repeated.values())
+    return _StrongSchema(len(repeated), total, line, sample)
+
+
+def _strong_schema_message(subject: str, schema: _StrongSchema) -> str:
+    return (
+        f"{subject} repeats {schema.distinct} bold field labels "
+        f"{schema.total} times ({schema.sample}) — pervasive emphasis "
+        "dilutes which instructions stand out"
+    )
+
+
+def _check_excessive_strong(skill: SkillInfo) -> list[Diagnostic]:
+    """Check for markdown files that bold the same field labels over and over."""
+    diags: list[Diagnostic] = []
+
+    schema = _repeated_strong_schema(skill.body)
+    if schema is not None:
+        diags.append(
+            Diagnostic(
+                Level.INFO,
+                "2e.excessive-strong",
+                _strong_schema_message("SKILL.md", schema),
+                path=skill.skill_md_path,
+                line=skill.body_line_offset + schema.line,
+            )
+        )
+
+    skill_dir = Path(skill.dir_path)
+    for entry in _iter_disclosure_md_files(skill_dir):
+        try:
+            content = entry.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        schema = _repeated_strong_schema(content)
+        if schema is None:
+            continue
+        rel = entry.relative_to(skill_dir)
+        diags.append(
+            Diagnostic(
+                Level.INFO,
+                "2e.excessive-strong",
+                _strong_schema_message(f"'{rel}'", schema),
+                path=str(entry),
+                line=schema.line,
+            )
+        )
 
     return diags
 
