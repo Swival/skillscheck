@@ -161,6 +161,17 @@ class TestCollectStrongLabels:
     def test_inline_code_ignored(self):
         assert collect_strong_labels("`**Repo:**` a\n") == {}
 
+    def test_inline_code_before_the_span_is_not_a_label(self):
+        text = "`ctx` **Repo:** a\n\n- `ctx` **Repo:** b\n"
+        assert collect_strong_labels(text) == {}
+
+    def test_inline_code_inside_a_label_stays_distinct(self):
+        text = "**Use `model-a` for:** a\n\n**Use `model-b` for:** b\n"
+        assert collect_strong_labels(text) == {
+            "use `model-a` for": StrongLabel(count=1, first_line=1),
+            "use `model-b` for": StrongLabel(count=1, first_line=3),
+        }
+
     def test_escaped_delimiter_ignored(self):
         assert collect_strong_labels("\\**Repo:** a\n") == {}
 

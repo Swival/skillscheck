@@ -308,7 +308,7 @@ def _leading_strong_label(line: str, paragraph_start: bool) -> str | None:
     if marker is None and not paragraph_start:
         return None
 
-    body = INLINE_CODE_RE.sub("", line[marker.end() :] if marker else line).lstrip()
+    body = (line[marker.end() :] if marker else line).lstrip()
     match = STRONG_RE.match(body)
     if match is None:
         return None

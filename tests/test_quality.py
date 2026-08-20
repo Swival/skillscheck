@@ -896,6 +896,12 @@ class TestExcessiveStrong:
         d = _reference_skill(tmp_path, "one-off", content)
         assert not _has_check(check_skill(parse_skill(d)), "2e.excessive-strong")
 
+    def test_code_prefixed_labels_stay_silent(self, tmp_path):
+        fields = ("Repo", "Source", "Demonstrates", "Watch out for", "Last verified")
+        content = "".join(f"`ctx` **{name}:** value\n\n" for name in fields * 2)
+        d = _reference_skill(tmp_path, "code-prefixed", content)
+        assert not _has_check(check_skill(parse_skill(d)), "2e.excessive-strong")
+
     def test_repeated_setext_headings_stay_silent(self, tmp_path):
         fields = ("Repo", "Source", "Demonstrates", "Watch out for", "Last verified")
         content = "".join(f"**{name}:**\n{'-' * 12}\n\n" for name in fields * 2)
