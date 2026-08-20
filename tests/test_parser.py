@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-
-from skillscheck.parser import parse_skill, discover_skills, _split_frontmatter
+from skillscheck.parser import _split_frontmatter, discover_skills, parse_skill
 
 
 class TestSplitFrontmatter:
@@ -15,38 +14,38 @@ class TestSplitFrontmatter:
 
     def test_missing_opening_delimiter(self):
         text = "name: foo\n---\nBody"
-        fm, body, offset, error = _split_frontmatter(text)
+        _fm, _body, _offset, error = _split_frontmatter(text)
         assert error is not None
         assert "opening" in error
 
     def test_missing_closing_delimiter(self):
         text = "---\nname: foo\nBody without closing"
-        fm, body, offset, error = _split_frontmatter(text)
+        _fm, _body, _offset, error = _split_frontmatter(text)
         assert error is not None
         assert "closing" in error
 
     def test_invalid_yaml(self):
         text = "---\nname: [invalid: yaml: {{{\n---\nBody"
-        fm, body, offset, error = _split_frontmatter(text)
+        _fm, _body, _offset, error = _split_frontmatter(text)
         assert error is not None
         assert "invalid YAML" in error
 
     def test_empty_frontmatter(self):
         text = "---\n---\nBody"
-        fm, body, offset, error = _split_frontmatter(text)
+        fm, body, _offset, error = _split_frontmatter(text)
         assert error is None
         assert fm == {}
         assert "Body" in body
 
     def test_non_dict_frontmatter(self):
         text = "---\n- item1\n- item2\n---\nBody"
-        fm, body, offset, error = _split_frontmatter(text)
+        _fm, _body, _offset, error = _split_frontmatter(text)
         assert error is not None
         assert "mapping" in error
 
     def test_body_line_offset(self):
         text = "---\nname: test\n---\nline one\nline two"
-        fm, body, offset, error = _split_frontmatter(text)
+        _fm, _body, offset, error = _split_frontmatter(text)
         assert error is None
         assert offset == 3
 

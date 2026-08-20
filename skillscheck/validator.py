@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import overload
 
 from .agents import cross_agent_check, get_adapters
-from .checks import spec, quality, disclosure
+from .checks import disclosure, quality, spec
 from .fixer import apply_fixes, has_fixable
 from .models import ValidationResult
 from .parser import discover_skills, parse_skill

@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Protocol
 
 from ..models import Diagnostic, Level, SkillInfo
-
 from .claude import ClaudeAdapter
 from .codex import CodexAdapter
 from .copilot import CopilotAdapter

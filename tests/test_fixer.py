@@ -1,12 +1,12 @@
 from pathlib import Path
 
 from skillscheck.fixer import (
-    apply_fixes,
-    _fix_name_lowercase,
-    _fix_name_consecutive_hyphens,
     _fix_dir_match,
+    _fix_name_consecutive_hyphens,
+    _fix_name_lowercase,
+    apply_fixes,
 )
-from skillscheck.models import SkillDiagnostics, Diagnostic, Level, ValidationResult
+from skillscheck.models import Diagnostic, Level, SkillDiagnostics, ValidationResult
 from skillscheck.parser import parse_skill
 from skillscheck.validator import validate
 
@@ -174,7 +174,7 @@ class TestApplyFixes:
 class TestValidateWithFix:
     def test_fix_mode_returns_tuple(self, tmp_path):
         _make_skill(tmp_path, "good", "good")
-        result, fixes = validate(tmp_path, fix=True)
+        _result, fixes = validate(tmp_path, fix=True)
         assert isinstance(fixes, list)
 
     def test_fix_mode_fixes_uppercase(self, tmp_path):
@@ -190,7 +190,7 @@ class TestValidateWithFix:
 
     def test_fix_mode_renames_directory(self, tmp_path):
         _make_skill(tmp_path, "wrong-dir", "correct-dir")
-        result, fixes = validate(tmp_path, fix=True)
+        _result, fixes = validate(tmp_path, fix=True)
         assert any("renamed" in f for f in fixes)
         assert (tmp_path / "skills" / "correct-dir").exists()
         assert not (tmp_path / "skills" / "wrong-dir").exists()
@@ -226,6 +226,7 @@ class TestValidateWithFix:
 class TestCLIFix:
     def test_fix_flag_text_output(self, tmp_path):
         from click.testing import CliRunner
+
         from skillscheck.cli import main
 
         _make_skill(tmp_path, "old-name", "new-name")
@@ -236,9 +237,11 @@ class TestCLIFix:
         assert "re-validation" in result.output
 
     def test_fix_flag_json_output(self, tmp_path):
-        from click.testing import CliRunner
-        from skillscheck.cli import main
         import json
+
+        from click.testing import CliRunner
+
+        from skillscheck.cli import main
 
         _make_skill(tmp_path, "old-name", "new-name")
         runner = CliRunner()
@@ -249,6 +252,7 @@ class TestCLIFix:
 
     def test_fix_flag_no_fixable_issues(self, tmp_path):
         from click.testing import CliRunner
+
         from skillscheck.cli import main
 
         _make_skill(tmp_path, "good", "good")
@@ -271,7 +275,7 @@ class TestFixPassCap:
         monkeypatch.setattr(v, "apply_fixes", noop_apply)
 
         _make_skill(tmp_path, "BadName", "BadName")
-        result, fixes = validate(tmp_path, fix=True)
+        _result, fixes = validate(tmp_path, fix=True)
 
         assert "fake fix (no-op)" in fixes
         assert any("pass limit" in f for f in fixes)

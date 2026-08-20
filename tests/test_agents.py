@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import json
 
-
 import yaml
 
+from skillscheck.agents import ALL_ADAPTERS, cross_agent_check, get_adapters
 from skillscheck.agents.claude import ClaudeAdapter
 from skillscheck.agents.codex import CodexAdapter
 from skillscheck.agents.copilot import CopilotAdapter
@@ -13,7 +13,6 @@ from skillscheck.agents.gemini import GeminiAdapter
 from skillscheck.agents.roo import RooAdapter
 from skillscheck.agents.swival import SwivalAdapter
 from skillscheck.agents.windsurf import WindsurfAdapter
-from skillscheck.agents import get_adapters, cross_agent_check, ALL_ADAPTERS
 from skillscheck.models import Level, SkillInfo
 
 

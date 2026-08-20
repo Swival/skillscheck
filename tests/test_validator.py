@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import json
 
-
-from skillscheck.validator import validate
 from skillscheck.models import Level, SkillDiagnostics
+from skillscheck.validator import validate
 
 
 def _all_diags(result):
@@ -240,7 +239,7 @@ class TestValidationResult:
         assert c["errors"] >= 1
 
     def test_add_skill_creates_entry(self):
-        from skillscheck.models import ValidationResult, Diagnostic, Level
+        from skillscheck.models import Diagnostic, Level, ValidationResult
 
         result = ValidationResult()
         result.add_skill("test", "spec", Diagnostic(Level.ERROR, "test.check", "msg"))
@@ -248,7 +247,7 @@ class TestValidationResult:
         assert len(result.skills["test"].spec) == 1
 
     def test_add_skill_different_categories(self):
-        from skillscheck.models import ValidationResult, Diagnostic, Level
+        from skillscheck.models import Diagnostic, Level, ValidationResult
 
         result = ValidationResult()
         result.add_skill(
@@ -278,7 +277,7 @@ class TestValidationResult:
         assert "disclosure" not in d
 
     def test_add_agent_creates_entry(self):
-        from skillscheck.models import ValidationResult, Diagnostic, Level
+        from skillscheck.models import Diagnostic, Level, ValidationResult
 
         result = ValidationResult()
         result.add_agent("claude", Diagnostic(Level.WARNING, "test.check", "msg"))

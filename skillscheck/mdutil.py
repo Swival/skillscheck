@@ -71,7 +71,7 @@ def _strip_indented_blocks(text: str) -> str:
     prev_blank = True
 
     for line in lines:
-        is_indented = line.startswith("    ") or line.startswith("\t")
+        is_indented = line.startswith(("    ", "\t"))
         is_blank = line.strip() == ""
 
         if is_indented and prev_blank and not is_blank:
@@ -79,9 +79,7 @@ def _strip_indented_blocks(text: str) -> str:
             continue
         if is_indented and not prev_blank and len(result) > 0:
             last_kept = result[-1] if result else ""
-            if last_kept.strip() == "" or (
-                last_kept.startswith("    ") or last_kept.startswith("\t")
-            ):
+            if last_kept.strip() == "" or last_kept.startswith(("    ", "\t")):
                 continue
 
         result.append(line)
@@ -181,10 +179,9 @@ def find_unclosed_fence(text: str) -> int | None:
                 fence_line = i + 1
         else:
             char, n = _fence_prefix(stripped)
-            if n >= fence_len and char == fence_char:
-                # Closing fence: rest must be only whitespace
-                if stripped[n:].strip() == "":
-                    in_fence = False
+            # Closing fence: rest must be only whitespace
+            if n >= fence_len and char == fence_char and stripped[n:].strip() == "":
+                in_fence = False
 
     return fence_line if in_fence else None
 
@@ -276,7 +273,7 @@ def collect_strong_labels(text: str) -> dict[str, StrongLabel]:
         if not line.strip():
             prev_blank = True
             continue
-        if prev_blank and (line.startswith("    ") or line.startswith("\t")):
+        if prev_blank and line.startswith(("    ", "\t")):
             continue
         if HEADING_LINE_RE.match(line) or THEMATIC_BREAK_RE.match(line):
             prev_blank = False

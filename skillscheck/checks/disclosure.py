@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..models import Diagnostic, Level, SPEC_URL, SkillInfo
 from ..mdutil import extract_local_link_targets
+from ..models import SPEC_URL, Diagnostic, Level, SkillInfo
 from ..tokenutil import estimate_file_tokens
 
 
@@ -56,7 +56,7 @@ def _check_nesting(skill: SkillInfo) -> list[Diagnostic]:
         ref_path = skill_dir / link_target
         if not ref_path.is_file():
             continue
-        if not ref_path.suffix.lower() == ".md":
+        if ref_path.suffix.lower() != ".md":
             continue
 
         try:

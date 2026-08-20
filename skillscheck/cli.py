@@ -12,7 +12,6 @@ import click
 from .models import Diagnostic, Level, ValidationResult
 from .validator import validate
 
-
 LEVEL_SYMBOLS = {
     Level.ERROR: "\u2717",  # ✗
     Level.WARNING: "\u26a0",  # ⚠

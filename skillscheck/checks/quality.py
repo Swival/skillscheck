@@ -8,7 +8,6 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import NamedTuple
 
-from ..models import Diagnostic, Level, SPEC_URL, SkillInfo
 from ..mdutil import (
     collect_strong_labels,
     extract_fragment_links,
@@ -16,6 +15,7 @@ from ..mdutil import (
     extract_local_link_targets,
     find_unclosed_fence,
 )
+from ..models import SPEC_URL, Diagnostic, Level, SkillInfo
 
 SECRET_FILENAMES = {
     ".env",

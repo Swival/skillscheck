@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-
-from skillscheck.parser import parse_skill
 from skillscheck.checks.quality import check_skill
 from skillscheck.models import Level
+from skillscheck.parser import parse_skill
 
 
 def _has_check(diags, check_prefix):

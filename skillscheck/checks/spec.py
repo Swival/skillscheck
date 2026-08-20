@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from ..models import Diagnostic, Level, SPEC_URL, SkillInfo
+from ..models import SPEC_URL, Diagnostic, Level, SkillInfo
 from ..tokenutil import count_tokens
 
 BASE_SPEC_FIELDS = {
@@ -73,9 +73,7 @@ def _is_known_tool(name: str) -> bool:
     base = name.split("(")[0] if "(" in name else name
     if base in KNOWN_TOOL_NAMES:
         return True
-    if base.startswith("mcp__"):
-        return True
-    return False
+    return bool(base.startswith("mcp__"))
 
 
 def check_skill(
