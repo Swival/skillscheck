@@ -13,14 +13,17 @@ SETEXT_H1_RE = re.compile(r"^(.+)\n=+\s*$", re.MULTILINE)
 SETEXT_H2_RE = re.compile(r"^(.+)\n-+\s*$", re.MULTILINE)
 
 BLOCKQUOTE_PREFIX_RE = re.compile(r"^(?: {0,3}> ?)+")
-HEADING_LINE_RE = re.compile(r"^ {0,3}#{1,6}\s")
+HEADING_LINE_RE = re.compile(r"^ {0,3}#{1,6}(?:\s|$)")
 THEMATIC_BREAK_RE = re.compile(r"^ {0,3}((\*\s*){3,}|(-\s*){3,}|(_\s*){3,})$")
-LIST_MARKER_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
+LIST_MARKER_RE = re.compile(r"^\s*(?:[-*+]|\d{1,9}[.)])[ \t]{1,4}(?![ \t])")
+# Only a bullet or a first ordered item can interrupt a paragraph.
+INTERRUPTING_LIST_RE = re.compile(r"^ {0,3}(?:[-*+]|1[.)])[ \t]+\S")
 SETEXT_UNDERLINE_RE = re.compile(r"^ {0,3}(=+|-+)[ \t]*$")
 STRONG_RE = re.compile(r"(?<!\\)(\*\*|__)(?=\S)(.+?)(?<=\S)(?<!\\)\1")
 WORD_CHAR_RE = re.compile(r"\w")
 
 MAX_LABEL_WORDS = 4
+TAB_STOP = 4
 
 
 def strip_code(text: str) -> str:
@@ -245,29 +248,37 @@ def collect_strong_labels(text: str) -> dict[str, StrongLabel]:
     behaves like a plain one. The reported line numbers stay physical.
     """
     labels: dict[str, StrongLabel] = {}
-    lines = text.split("\n")
+    lines = text.replace("\r\n", "\n").split("\n")
     in_fence = False
     fence_char = ""
     fence_len = 0
+    fence_depth = 0
     prev_blank = True
 
     for number, source_line in enumerate(lines, 1):
-        line = BLOCKQUOTE_PREFIX_RE.sub("", source_line)
+        depth, line = _strip_quote_prefix(source_line)
         unindented = _strip_fence_indent(line)
         char, run = _fence_prefix(unindented)
 
         if in_fence:
-            if (
-                char == fence_char
-                and run >= fence_len
-                and unindented[run:].strip() == ""
-            ):
-                in_fence = False
-            continue
+            # A fence never survives the quote level that holds it.
+            if depth >= fence_depth:
+                if (
+                    depth == fence_depth
+                    and char == fence_char
+                    and run >= fence_len
+                    and unindented[run:].strip() == ""
+                ):
+                    in_fence = False
+                    prev_blank = True
+                continue
+            in_fence = False
+            prev_blank = True
         if run >= 3:
             in_fence = True
             fence_char = char
             fence_len = run
+            fence_depth = depth
             prev_blank = False
             continue
         if not line.strip():
@@ -276,11 +287,11 @@ def collect_strong_labels(text: str) -> dict[str, StrongLabel]:
         if prev_blank and line.startswith(("    ", "\t")):
             continue
         if HEADING_LINE_RE.match(line) or THEMATIC_BREAK_RE.match(line):
-            prev_blank = False
+            prev_blank = True
             continue
-        # Under a list item the same dashes are a break, not an underline.
-        if not LIST_MARKER_RE.match(line) and _is_setext_underline(
-            lines[number] if number < len(lines) else ""
+        marker = LIST_MARKER_RE.match(line)
+        if (prev_blank or marker) and _starts_setext_heading(
+            lines, number, depth, _column(line, marker.end()) if marker else 0
         ):
             prev_blank = False
             continue
@@ -297,9 +308,47 @@ def collect_strong_labels(text: str) -> dict[str, StrongLabel]:
     return labels
 
 
-def _is_setext_underline(source_line: str) -> bool:
-    """Tell if a line turns the paragraph above it into a heading."""
-    return bool(SETEXT_UNDERLINE_RE.match(BLOCKQUOTE_PREFIX_RE.sub("", source_line)))
+def _column(line: str, offset: int) -> int:
+    """Give the display column of an offset, with the tabs expanded."""
+    return len(line[:offset].expandtabs(TAB_STOP))
+
+
+def _strip_quote_prefix(source_line: str) -> tuple[int, str]:
+    """Split a line into its blockquote depth and the text after the markers."""
+    prefix = BLOCKQUOTE_PREFIX_RE.match(source_line)
+    if prefix is None:
+        return 0, source_line
+    return prefix.group().count(">"), source_line[prefix.end() :]
+
+
+def _starts_setext_heading(
+    lines: list[str], index: int, depth: int, indent: int
+) -> bool:
+    """Tell if the paragraph that continues from this index is a heading.
+
+    An underline closes the whole paragraph, so a label on the first line of a
+    setext heading is a heading and never a field label. The paragraph stops at
+    the first line of another block. It also stops at a change of quote level.
+    It stops again where a line leaves the list item behind it.
+    """
+    for source_line in lines[index:]:
+        line_depth, line = _strip_quote_prefix(source_line)
+        line = line.expandtabs(TAB_STOP)
+        if line_depth != depth or len(line) - len(line.lstrip(" ")) < indent:
+            return False
+        line = line[indent:]
+        if SETEXT_UNDERLINE_RE.match(line):
+            return True
+        if not line.strip() or THEMATIC_BREAK_RE.match(line):
+            return False
+        if HEADING_LINE_RE.match(line) or INTERRUPTING_LIST_RE.match(line):
+            return False
+        if _fence_prefix(_strip_fence_indent(line))[1] >= 3:
+            return False
+        # A comment or a declaration always ends the paragraph. A bare tag may not.
+        if line.lstrip(" ").startswith(("<!", "<?")):
+            return False
+    return False
 
 
 def _leading_strong_label(line: str, paragraph_start: bool) -> str | None:
@@ -309,14 +358,16 @@ def _leading_strong_label(line: str, paragraph_start: bool) -> str | None:
         return None
 
     body = (line[marker.end() :] if marker else line).lstrip()
-    match = STRONG_RE.match(body)
+    # A delimiter inside a code span must not close a label.
+    masked = INLINE_CODE_RE.sub(lambda span: "\0" * len(span.group()), body)
+    match = STRONG_RE.match(masked)
     if match is None:
         return None
-    # Underscore emphasis, unlike `**`, does not survive inside a word.
-    if match.group(1) == "__" and WORD_CHAR_RE.match(body[match.end() :]):
+    # A word glued to the closing delimiter keeps it from closing the span.
+    if WORD_CHAR_RE.match(masked[match.end() :]):
         return None
 
-    content = match.group(2)
+    content = body[match.start(2) : match.end(2)]
     if not content.endswith(":") or len(content.split()) > MAX_LABEL_WORDS:
         return None
     return re.sub(r"\s+", " ", content.rstrip(":").strip()).casefold() or None

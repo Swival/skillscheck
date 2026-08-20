@@ -104,13 +104,14 @@ class TestCollectStrongLabels:
     def test_strong_text_without_a_colon_ignored(self):
         assert collect_strong_labels("- **Repo** a\n") == {}
 
-    def test_double_asterisk_may_touch_a_word(self):
-        assert collect_strong_labels("**Repo:**value\n") == {
+    def test_a_glued_word_blocks_the_closing_delimiter(self):
+        assert collect_strong_labels("**Repo:**value\n") == {}
+        assert collect_strong_labels("__Repo:__value\n") == {}
+
+    def test_punctuation_after_the_delimiter_keeps_the_label(self):
+        assert collect_strong_labels("**Repo:**.\n") == {
             "repo": StrongLabel(count=1, first_line=1)
         }
-
-    def test_underscore_emphasis_inside_a_word_rejected(self):
-        assert collect_strong_labels("__Repo:__value\n") == {}
 
     def test_blockquote_prefix_removed(self):
         text = "> **Repo:** a\n>\n> - **Repo:** b\n"
@@ -193,8 +194,103 @@ class TestCollectStrongLabels:
         text = "**Repo:**\n---------\n\n**Repo:**\n---------\n"
         assert collect_strong_labels(text) == {}
 
+    def test_multiline_setext_paragraph_makes_a_heading(self):
+        text = "**Repo:**\nDetails\n---\n\n**Repo:**\nDetails\n---\n"
+        assert collect_strong_labels(text) == {}
+
+    def test_paragraph_that_a_fence_interrupts_keeps_its_label(self):
+        text = "**Repo:** a\n```\n===\n```\n"
+        assert collect_strong_labels(text) == {
+            "repo": StrongLabel(count=1, first_line=1)
+        }
+
     def test_quoted_setext_underline_makes_a_heading(self):
         text = "> **Repo:**\n> ---\n>\n> **Repo:**\n> ---\n"
+        assert collect_strong_labels(text) == {}
+
+    def test_setext_underline_inside_a_list_item_makes_a_heading(self):
+        text = "- **Repo:**\n  Details\n  ---\n\n- **Repo:**\n  Details\n  ---\n"
+        assert collect_strong_labels(text) == {}
+
+    def test_a_quote_does_not_continue_the_paragraph_above_it(self):
+        text = "**Repo:** a\n> Details\n> ---\n"
+        assert collect_strong_labels(text) == {
+            "repo": StrongLabel(count=1, first_line=1)
+        }
+
+    def test_a_deeper_quote_keeps_its_own_paragraph(self):
+        text = "> > **Repo:**\n> ---\n"
+        assert collect_strong_labels(text) == {
+            "repo": StrongLabel(count=1, first_line=1)
+        }
+
+    def test_html_block_interrupts_the_paragraph(self):
+        text = "**Repo:** a\n<!-- break -->\nDetails\n---\n"
+        assert collect_strong_labels(text) == {
+            "repo": StrongLabel(count=1, first_line=1)
+        }
+
+    def test_empty_heading_interrupts_the_paragraph(self):
+        text = "**Repo:** a\n#\nDetails\n---\n"
+        assert collect_strong_labels(text) == {
+            "repo": StrongLabel(count=1, first_line=1)
+        }
+
+    def test_code_span_may_hold_the_emphasis_delimiter(self):
+        text = "**Match `**/*.py` files:** a\n\n__Call `__init__` with:__ b\n"
+        assert collect_strong_labels(text) == {
+            "match `**/*.py` files": StrongLabel(count=1, first_line=1),
+            "call `__init__` with": StrongLabel(count=1, first_line=3),
+        }
+
+    def test_wide_marker_gap_makes_code_not_a_list_item(self):
+        text = "-     **Repo:** a\n\n-     **Repo:** b\n"
+        assert collect_strong_labels(text) == {}
+
+    def test_only_a_first_ordered_item_interrupts_the_paragraph(self):
+        assert collect_strong_labels("**Repo:** a\n2. Details\n---\n") == {}
+        assert collect_strong_labels("**Repo:** a\n1. Details\n---\n") == {
+            "repo": StrongLabel(count=1, first_line=1)
+        }
+
+    def test_a_bare_tag_does_not_end_the_paragraph(self):
+        text = "**Repo:** a\n<span>\nDetails\n---\n"
+        assert collect_strong_labels(text) == {}
+
+    def test_a_wide_ordered_marker_is_not_a_list_item(self):
+        text = "1234567890. **Repo:** a\n\n1234567890. **Repo:** b\n"
+        assert collect_strong_labels(text) == {}
+
+    def test_a_block_end_starts_a_new_paragraph(self):
+        for text in (
+            "***\n**Repo:** a\n",
+            "# Title\n**Repo:** a\n",
+            "```\nx\n```\n**Repo:** a\n",
+        ):
+            assert collect_strong_labels(text) == {
+                "repo": StrongLabel(count=1, first_line=text.count("\n"))
+            }
+
+    def test_windows_line_endings_do_not_hide_a_setext_heading(self):
+        text = "**Repo:**\r\n---\r\n\r\n**Repo:**\r\n---\r\n"
+        assert collect_strong_labels(text) == {}
+
+    def test_a_fence_does_not_close_at_another_quote_level(self):
+        text = "> ```\n```\n**Repo:** a\n"
+        assert collect_strong_labels(text) == {}
+
+    def test_a_deeper_quote_inside_a_fence_stays_content(self):
+        text = "> ```\n> > ```\n> **Repo:** a\n> ```\n"
+        assert collect_strong_labels(text) == {}
+
+    def test_a_quoted_line_inside_a_fence_stays_content(self):
+        text = "```\n> **Repo:** a\n```\n\n**Source:** b\n"
+        assert collect_strong_labels(text) == {
+            "source": StrongLabel(count=1, first_line=5)
+        }
+
+    def test_a_tab_indents_a_list_continuation(self):
+        text = "- **Repo:**\n\t---\n\n- **Repo:**\n\t---\n"
         assert collect_strong_labels(text) == {}
 
     def test_dashes_under_a_list_item_stay_a_thematic_break(self):
